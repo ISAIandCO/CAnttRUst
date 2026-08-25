@@ -16,7 +16,7 @@
     "scan:bundle": "node scripts/scan-bundle.mjs",
     "lint:firefox": "web-ext lint --source-dir dist/firefox --warnings-as-errors",
     "build:firefox": "tsc --noEmit && vitest run && node scripts/build.mjs && node scripts/verify-policy.mjs && node scripts/scan-bundle.mjs && web-ext lint --source-dir dist/firefox --warnings-as-errors",
-    "build:self-hosted": "tsc --noEmit && vitest run && node scripts/build.mjs self-hosted && node scripts/verify-policy.mjs && node scripts/scan-bundle.mjs && web-ext lint --source-dir dist/firefox --warnings-as-errors",
+    "build:self-hosted": "tsc --noEmit && vitest run && node scripts/build.mjs self-hosted && node scripts/verify-policy.mjs && node scripts/scan-bundle.mjs && web-ext lint --source-dir dist/firefox --self-hosted --warnings-as-errors",
     "package:firefox": "tsc --noEmit && vitest run && node scripts/build.mjs && node scripts/verify-policy.mjs && node scripts/scan-bundle.mjs && web-ext lint --source-dir dist/firefox --warnings-as-errors && web-ext build --source-dir dist/firefox --artifacts-dir artifacts --filename canttrust-{version}-firefox.zip --overwrite-dest",
     "check:reproducible": "node scripts/check-reproducible.mjs"
   },
