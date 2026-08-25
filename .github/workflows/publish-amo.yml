@@ -1,0 +1,58 @@
+name: Publish to AMO
+run-name: Submit listed build from ${{ github.ref_name }}
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  submit-listed:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.22.2
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build:firefox
+
+      - name: Create source archive
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          mkdir -p artifacts/source artifacts/amo
+          git archive --format=zip --output="artifacts/source/canttrust-${version}-source.zip" HEAD
+          echo "SOURCE_ARCHIVE=artifacts/source/canttrust-${version}-source.zip" >> "$GITHUB_ENV"
+
+      - name: Submit listed build to AMO
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: >-
+          ./node_modules/.bin/web-ext sign
+          --source-dir dist/firefox
+          --artifacts-dir artifacts/amo
+          --channel listed
+          --amo-metadata amo-metadata.json
+          --upload-source-code "$SOURCE_ARCHIVE"
+          --approval-timeout 0
+          --api-key "$WEB_EXT_API_KEY"
+          --api-secret "$WEB_EXT_API_SECRET"
+          --no-input
+
+      - name: Keep AMO response artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: amo-submission
+          path: artifacts/amo/*
+          if-no-files-found: warn
+          retention-days: 14
+

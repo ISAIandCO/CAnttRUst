@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "cas": [
+    {
+      "id": "russian-trusted-root-ca",
+      "name": "Russian Trusted Root CA",
+      "rootDerSha256": [
+        "d26d2d0231b7c39f92cc738512ba54103519e4405d68b5bd703e9788ca8ecf31"
+      ],
+      "allowedDnsZones": ["ru", "su", "xn--p1ai"],
+      "allowIp": false,
+      "ctPolicy": "russian-nuc"
+    }
+  ],
+  "ctPolicies": [
+    {
+      "id": "russian-nuc",
+      "mode": "yandex-required",
+      "minimumValidScts": 1,
+      "requiredOperators": ["Yandex"],
+      "minimumDistinctOperators": 1
+    },
+    {
+      "id": "russian-nuc-hardened",
+      "mode": "hardened",
+      "minimumValidScts": 2,
+      "requiredOperators": ["Yandex"],
+      "minimumDistinctOperators": 2
+    }
+  ]
+}

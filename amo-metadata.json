@@ -1,0 +1,9 @@
+{
+  "summary": {
+    "ru": "Ограничивает применение Russian Trusted Root CA российскими доменными зонами и проверяет встроенные SCT российских CT-логов."
+  },
+  "categories": ["privacy-security"],
+  "version": {
+    "license": "GPL-3.0-only"
+  }
+}

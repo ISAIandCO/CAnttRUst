@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CAnttRUst — соединение заблокировано</title>
+    <link rel="stylesheet" href="warning.css">
+  </head>
+  <body>
+    <main>
+      <img class="mascot" src="icons/icon-128.png" alt="Медведь-вор CAnttRUst" width="128" height="128">
+      <p class="eyebrow">CAnttRUst</p>
+      <h1>Соединение заблокировано политикой сертификатов</h1>
+      <p id="reason" class="reason">Загрузка сведений о соединении…</p>
+      <p class="timing"><strong>Важно:</strong> расширение обнаруживает сертификат после TLS handshake, поэтому запрос и его заголовки уже могли быть отправлены серверу.</p>
+      <dl id="details" hidden>
+        <div><dt>Хост</dt><dd id="host"></dd></div>
+        <div><dt>SHA-256 сертификата сайта</dt><dd id="leaf"></dd></div>
+        <div><dt>SHA-256 защищаемого CA</dt><dd id="root"></dd></div>
+        <div><dt>Subject</dt><dd id="subject"></dd></div>
+        <div><dt>Issuer</dt><dd id="issuer"></dd></div>
+        <div><dt>CT</dt><dd id="ct"></dd></div>
+      </dl>
+      <p id="error" class="error" hidden></p>
+      <div class="actions">
+        <button id="back" type="button" class="secondary">Назад</button>
+        <button id="continue" type="button">Продолжить один раз</button>
+        <button id="allow" type="button" class="danger">Всегда разрешать этот хост</button>
+      </div>
+    </main>
+    <script src="warning.js"></script>
+  </body>
+</html>

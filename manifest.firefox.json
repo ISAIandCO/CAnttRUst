@@ -1,0 +1,48 @@
+{
+  "manifest_version": 2,
+  "name": "CAnttRUst",
+  "version": "0.1.0",
+  "description": "Ограничивает применение Russian Trusted Root CA и проверяет российские CT-логи.",
+  "permissions": [
+    "webRequest",
+    "webRequestBlocking",
+    "storage",
+    "<all_urls>"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": true
+  },
+  "browser_action": {
+    "default_title": "CAnttRUst — настройки",
+    "default_icon": {
+      "48": "icons/icon-48.png",
+      "96": "icons/icon-96.png"
+    }
+  },
+  "icons": {
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png",
+    "128": "icons/icon-128.png"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "web_accessible_resources": [
+    "warning.html",
+    "warning.css",
+    "warning.js",
+    "icons/icon-96.png"
+  ],
+  "content_security_policy": "script-src 'self'; object-src 'none'; base-uri 'none'",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "canttrust@isaiandco.local",
+      "strict_min_version": "142.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  }
+}

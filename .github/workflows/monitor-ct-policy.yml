@@ -1,0 +1,62 @@
+name: Monitor CT policy
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.22.2
+
+      - name: Check accepted CT logs
+        id: policy
+        shell: bash
+        run: |
+          node scripts/update-ct-policy.mjs
+          if git diff --quiet -- src/policy/ct; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            mkdir -p artifacts/ct-policy-candidate
+            git diff -- src/policy/ct > artifacts/ct-policy-candidate/ct-policy.diff
+            cp src/policy/ct/*.json artifacts/ct-policy-candidate/
+          fi
+
+      - name: Upload candidate policy
+        if: steps.policy.outputs.changed == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ct-policy-candidate
+          path: artifacts/ct-policy-candidate/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Open review issue
+        if: steps.policy.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Изменился список российских CT-логов"
+        shell: bash
+        run: |
+          issue="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,title \
+            --jq '[.[] | select(.title == "Изменился список российских CT-логов") | .number][0] // empty')"
+          body="Обнаружено изменение принятой CT-политики. Проверьте diff и JSON в артефакте запуска: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          if [ -z "$issue" ]; then
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body "$body"
+          else
+            gh issue edit "$issue" --repo "$GITHUB_REPOSITORY" --body "$body"
+          fi

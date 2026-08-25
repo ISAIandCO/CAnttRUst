@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CAnttRUst — настройки</title>
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="icons/icon-96.png" alt="" width="80" height="80">
+        <div><h1>CAnttRUst</h1><p>Локальная политика доверия для Russian Trusted Root CA</p></div>
+      </header>
+      <section>
+        <h2>Защита</h2>
+        <label class="row"><input id="enabled" type="checkbox"> Проверять HTTPS-переходы</label>
+        <label for="ct-mode">Режим Certificate Transparency</label>
+        <select id="ct-mode">
+          <option value="yandex-required">Требовать один SCT Яндекса</option>
+          <option value="hardened">Усиленный: два разных оператора, включая Яндекс</option>
+        </select>
+      </section>
+      <section>
+        <h2>Всегда разрешённые хосты</h2>
+        <p>Только точные DNS-имена. Поддомены, wildcard и IP автоматически не разрешаются.</p>
+        <ul id="allowlist"></ul>
+        <p id="empty">Список пуст.</p>
+        <div class="actions">
+          <button id="export" type="button">Экспорт</button>
+          <label class="file">Импорт JSON<input id="import" type="file" accept="application/json,.json"></label>
+        </div>
+      </section>
+      <section>
+        <h2>Диагностика</h2>
+        <dl>
+          <div><dt>Версия</dt><dd id="version"></dd></div>
+          <div><dt>Protected root SHA-256</dt><dd id="fingerprint"></dd></div>
+          <div><dt>CT snapshot</dt><dd id="snapshot"></dd></div>
+        </dl>
+      </section>
+      <p id="status" role="status"></p>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>

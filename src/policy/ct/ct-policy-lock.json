@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "source": "https://browser-resources.s3.yandex.net/ctlog/ctlog.json",
+  "retrievedAt": "2026-08-25T03:42:02.860Z",
+  "sourceSha256": "26bb8d8d623ca3d439301c13119db94aa68bf437cb290178b682b2a5529edd97",
+  "acceptedOperators": [
+    "Yandex",
+    "VK LLC",
+    "The Ministry of Digital Development and Communications"
+  ]
+}

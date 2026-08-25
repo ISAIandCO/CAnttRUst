@@ -1,0 +1,35 @@
+{
+  "name": "canttrust",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Restrict Russian CA trust to Russian domains in Firefox.",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build:raw": "node scripts/build.mjs",
+    "verify:policy": "node scripts/verify-policy.mjs",
+    "scan:bundle": "node scripts/scan-bundle.mjs",
+    "lint:firefox": "web-ext lint --source-dir dist/firefox --warnings-as-errors",
+    "build:firefox": "tsc --noEmit && vitest run && node scripts/build.mjs && node scripts/verify-policy.mjs && node scripts/scan-bundle.mjs && web-ext lint --source-dir dist/firefox --warnings-as-errors",
+    "build:self-hosted": "tsc --noEmit && vitest run && node scripts/build.mjs self-hosted && node scripts/verify-policy.mjs && node scripts/scan-bundle.mjs && web-ext lint --source-dir dist/firefox --warnings-as-errors",
+    "package:firefox": "tsc --noEmit && vitest run && node scripts/build.mjs && node scripts/verify-policy.mjs && node scripts/scan-bundle.mjs && web-ext lint --source-dir dist/firefox --warnings-as-errors && web-ext build --source-dir dist/firefox --artifacts-dir artifacts --filename canttrust-{version}-firefox.zip --overwrite-dest",
+    "check:reproducible": "node scripts/check-reproducible.mjs"
+  },
+  "dependencies": {
+    "@peculiar/asn1-schema": "2.9.4",
+    "@peculiar/asn1-x509": "2.9.4"
+  },
+  "devDependencies": {
+    "@types/node": "26.3.0",
+    "@types/firefox-webext-browser": "143.0.0",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11",
+    "web-ext": "10.6.0"
+  }
+}

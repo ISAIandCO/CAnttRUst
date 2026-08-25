@@ -1,0 +1,8 @@
+node_modules/
+dist/
+artifacts/
+web-ext-artifacts/
+*.log
+*.xpi
+*.zip
+
