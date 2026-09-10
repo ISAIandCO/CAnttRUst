@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import ctList from "../src/policy/ct/yandex-nuc-log-list.json" with { type: "json" };
+import ctList from "./fixtures/ct-log-list.json" with { type: "json" };
 import { hasCtPolicyChanged, normalizedCtList, validateCtList, validateCtUpdate } from "../scripts/policy-utils.mjs";
 const now = Date.parse("2026-09-10T00:00:00Z");
 

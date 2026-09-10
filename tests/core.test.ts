@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import ctList from "../src/policy/ct/yandex-nuc-log-list.json";
+import ctList from "./fixtures/ct-log-list.json";
 import { matchProtectedCA } from "../src/core/ca";
 import { ecdsaDerSignatureToRaw, isSctFromAcceptedState, parseSctList, verifyEmbeddedScts, type CtLog } from "../src/core/ct";
 import { normalizeSha256, sha256Hex } from "../src/core/fingerprint";

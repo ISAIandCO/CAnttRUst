@@ -11,6 +11,7 @@ afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: tru
 function setup() {
   const dir = mkdtempSync(join(tmpdir(), "canttrust-update-")); dirs.push(dir);
   for (const path of ["scripts", "src/policy", "package.json", "package-lock.json", "manifest.firefox.json"]) cpSync(join(source, path), join(dir, path), { recursive: true });
+  cpSync(join(source, "tests/fixtures/ct-log-list.json"), join(dir, "src/policy/ct/yandex-nuc-log-list.json"));
   const git = (...args) => execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   git("init", "-q"); git("add", "."); git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "baseline");
   const mock = join(dir, "mock.mjs");
