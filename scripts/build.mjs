@@ -1,5 +1,6 @@
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { build } from "esbuild";
+import { versionForChannel } from "./release-version.mjs";
 
 const dist = new URL("../dist/firefox/", import.meta.url);
 const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
@@ -17,6 +18,8 @@ if (channel === "self-hosted") {
 if (pkg.version !== manifest.version) {
   throw new Error(`Version mismatch: package ${pkg.version}, manifest ${manifest.version}`);
 }
+
+manifest.version = versionForChannel(pkg.version, channel === "self-hosted" ? "unlisted" : "listed");
 
 await rm(dist, { recursive: true, force: true });
 await mkdir(new URL("icons/", dist), { recursive: true });
@@ -51,4 +54,4 @@ await cp(new URL("../src/policy/protected-cas.json", import.meta.url), new URL("
 await cp(new URL("../src/policy/ct/yandex-nuc-log-list.json", import.meta.url), new URL("policy/ct/yandex-nuc-log-list.json", dist));
 await cp(new URL("../src/policy/ct/ct-policy-lock.json", import.meta.url), new URL("policy/ct/ct-policy-lock.json", dist));
 
-console.log(`Built ${pkg.name} ${pkg.version} (${channel}) in ${dist.pathname}`);
+console.log(`Built ${pkg.name} ${manifest.version} (${channel}) in ${dist.pathname}`);

@@ -3,43 +3,93 @@ run-name: Release signed XPI from ${{ github.ref_name }}
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [package.json, manifest.firefox.json]
 
 permissions:
   contents: read
 
+concurrency:
+  group: github-signed-release
+  cancel-in-progress: false
+
 jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      exists: ${{ steps.release.outputs.exists }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.22.2
+      - name: Check existing GitHub Release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync, appendFileSync } from 'node:fs';
+          const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
+          const response = await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/releases/tags/v${encodeURIComponent(version)}`, {
+            headers: { Authorization: `Bearer ${process.env.GH_TOKEN}`, Accept: 'application/vnd.github+json' },
+            signal: AbortSignal.timeout(30000), redirect: 'error'
+          });
+          if (!response.ok && response.status !== 404) throw new Error(`GitHub release check: HTTP ${response.status}`);
+          if (response.ok) {
+            const release = await response.json();
+            const names = new Set(release.assets.map(asset => asset.name));
+            const required = [`canttrust-${version}_git.xpi`, `canttrust-${version}-source.zip`, `canttrust-${version}-sbom.cdx.json`, 'updates.json', 'SHA256SUMS.txt'];
+            if (release.draft || required.some(name => !names.has(name))) throw new Error('Existing release is incomplete; inspect it before retrying');
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\nexists=${response.ok}\n`);
+          JS
+
   build-and-sign:
+    needs: prepare
+    if: needs.prepare.outputs.exists == 'false'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    outputs:
-      version: ${{ steps.meta.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22.22.2
           cache: npm
-
       - run: npm ci
       - run: npm run build:self-hosted
 
-      - name: Read version
-        id: meta
-        shell: bash
-        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
-
       - name: Prepare auditable source artifacts
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         shell: bash
         run: |
-          version="${{ steps.meta.outputs.version }}"
           mkdir -p artifacts/release
-          git archive --format=zip --output="artifacts/release/canttrust-${version}-source.zip" HEAD
-          npm sbom --sbom-format cyclonedx --omit=dev > "artifacts/release/canttrust-${version}-sbom.cdx.json"
+          git archive --format=zip --output="artifacts/release/canttrust-${RELEASE_VERSION}-source.zip" HEAD
+          npm sbom --sbom-format cyclonedx --omit=dev > "artifacts/release/canttrust-${RELEASE_VERSION}-sbom.cdx.json"
+          echo "SOURCE_ARCHIVE=artifacts/release/canttrust-${RELEASE_VERSION}-source.zip" >> "$GITHUB_ENV"
+
+      - name: Recover an already signed unlisted version
+        id: amo
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: node scripts/amo-status.mjs unlisted --download
+
+      - name: Wait for pending Mozilla review before retrying this workflow
+        if: steps.amo.outputs.status == 'unreviewed'
+        run: |
+          echo 'Unlisted version awaits Mozilla review. Rerun this workflow after approval; it will reuse the signed XPI.' >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
       - name: Request Mozilla unlisted signature
+        if: steps.amo.outputs.status == 'not-submitted'
         env:
           WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
           WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
@@ -48,31 +98,35 @@ jobs:
           --source-dir dist/firefox
           --artifacts-dir artifacts/signed
           --channel unlisted
+          --upload-source-code "$SOURCE_ARCHIVE"
           --api-key "$WEB_EXT_API_KEY"
           --api-secret "$WEB_EXT_API_SECRET"
           --no-input
 
       - name: Verify and checksum signed XPI
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         shell: bash
         run: |
-          version="${{ steps.meta.outputs.version }}"
+          version="$RELEASE_VERSION"
+          xpi_version="$(node -p "require('./dist/firefox/manifest.json').version")"
           update_url="https://github.com/ISAIandCO/CAnttRUst/releases/latest/download/updates.json"
           signed="$(find artifacts/signed -maxdepth 1 -type f -name '*.xpi' -print -quit)"
           test -n "$signed"
-          xpi="artifacts/release/canttrust-${version}-firefox.xpi"
+          xpi="artifacts/release/canttrust-${version}_git.xpi"
           mv "$signed" "$xpi"
-          unzip -p "$xpi" manifest.json | jq -e --arg version "$version" --arg update_url "$update_url" \
-            '.version == $version and .browser_specific_settings.gecko.update_url == $update_url'
+          unzip -p "$xpi" manifest.json | jq -e --arg version "$xpi_version" --arg update_url "$update_url" \
+            '.version == $version and .browser_specific_settings.gecko.id == "canttrust@isaiandco.local" and .browser_specific_settings.gecko.update_url == $update_url'
           digest="$(sha256sum "$xpi" | cut -d ' ' -f 1)"
           jq -n \
             --arg id "canttrust@isaiandco.local" \
-            --arg version "$version" \
-            --arg link "https://github.com/${GITHUB_REPOSITORY}/releases/download/v${version}/canttrust-${version}-firefox.xpi" \
+            --arg version "$xpi_version" \
+            --arg link "https://github.com/${GITHUB_REPOSITORY}/releases/download/v${version}/canttrust-${version}_git.xpi" \
             --arg hash "sha256:${digest}" \
             '{addons: {($id): {updates: [{version: $version, update_link: $link, update_hash: $hash}]}}}' \
             > artifacts/release/updates.json
           cd artifacts/release
-          sha256sum "canttrust-${version}-firefox.xpi" "canttrust-${version}-source.zip" \
+          sha256sum "canttrust-${version}_git.xpi" "canttrust-${version}-source.zip" \
             "canttrust-${version}-sbom.cdx.json" updates.json > SHA256SUMS.txt
 
       - name: Transfer release assets
@@ -81,10 +135,10 @@ jobs:
           name: release-assets
           path: artifacts/release/*
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 30
 
   publish-release:
-    needs: build-and-sign
+    needs: [prepare, build-and-sign]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -94,14 +148,14 @@ jobs:
         with:
           name: release-assets
           path: release-assets
-
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         run: >-
-          gh release create "v${{ needs.build-and-sign.outputs.version }}"
+          gh release create "v${RELEASE_VERSION}"
           release-assets/*
           --repo "$GITHUB_REPOSITORY"
           --target "$GITHUB_SHA"
-          --title "CAnttRUst v${{ needs.build-and-sign.outputs.version }}"
+          --title "CAnttRUst v${RELEASE_VERSION}"
           --generate-notes

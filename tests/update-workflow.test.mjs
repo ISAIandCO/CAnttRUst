@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { versionForChannel } from "../scripts/release-version.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -17,6 +19,7 @@ function setup() {
   const mock = join(dir, "mock.mjs");
   writeFileSync(mock, `import {readFileSync} from 'node:fs';
 globalThis.fetch = async (url) => {
+  if (String(url).includes('/downloads/')) return new Response(Buffer.from(process.env.XPI_BYTES || '', 'base64'));
   if (String(url).includes('addons.mozilla.org')) return new Response(process.env.AMO_BODY || '', {status:Number(process.env.AMO_HTTP || 200)});
   if (String(url).includes('gu-st.ru')) return new Response(readFileSync(process.env.ROOT_FILE), {status:Number(process.env.ROOT_HTTP || 200)});
   return new Response(readFileSync(process.env.CT_FILE));
@@ -26,7 +29,7 @@ globalThis.fetch = async (url) => {
   const env = { ...process.env, NODE_OPTIONS: `--import=${mock}`, CT_FILE: ctPath,
     ROOT_FILE: join(source, "tests/fixtures/russian-trusted-root-ca.pem"),
     GITHUB_OUTPUT: join(dir, "output"), GITHUB_STEP_SUMMARY: join(dir, "summary") };
-  const run = (script, extra = {}) => spawnSync(process.execPath, [`scripts/${script}`], { cwd: dir, env: { ...env, ...extra }, encoding: "utf8", timeout: 10000 });
+  const run = (script, extra = {}, args = []) => spawnSync(process.execPath, [`scripts/${script}`, ...args], { cwd: dir, env: { ...env, ...extra }, encoding: "utf8", timeout: 10000 });
   return { dir, git, ct, run, save: () => writeFileSync(ctPath, JSON.stringify(ct)), read: (path) => readFileSync(join(dir, path), "utf8") };
 }
 
@@ -80,5 +83,27 @@ describe("AMO preflight and status", () => {
     expect(t.read("output")).toContain("status=not-submitted");
     expect(t.run("amo-status.mjs", { ...secrets, AMO_HTTP: "503" }).status).toBe(1);
     expect(t.run("amo-status.mjs", { ...secrets, AMO_BODY: JSON.stringify({ version, channel: "unlisted", file: { status: "public" } }) }).status).toBe(1);
+  });
+});
+
+describe("dual-channel releases", () => {
+  it("uses distinct numeric versions with the same release base", () => {
+    expect(versionForChannel("0.1.2", "listed")).toBe("0.1.2");
+    expect(versionForChannel("0.1.2", "unlisted")).toBe("0.1.2.1");
+    expect(versionForChannel("0.1.3", "listed")).toBe("0.1.3");
+    expect(() => versionForChannel("0.1.2_git", "unlisted")).toThrow();
+    expect(() => versionForChannel("0.1.2", "unknown")).toThrow();
+  });
+  it("recovers a signed unlisted XPI and rejects a checksum mismatch", () => {
+    const t = setup(); const version = versionForChannel(JSON.parse(t.read("package.json")).version, "unlisted");
+    const bytes = Buffer.from("signed-test-package");
+    const body = { version, channel: "unlisted", file: { status: "public", url: "https://addons.mozilla.org/firefox/downloads/file/1/test.xpi", hash: `sha256:${createHash("sha256").update(bytes).digest("hex")}` } };
+    const env = { WEB_EXT_API_KEY: "test", WEB_EXT_API_SECRET: "test", AMO_BODY: JSON.stringify(body), XPI_BYTES: bytes.toString("base64") };
+    let result = t.run("amo-status.mjs", env, ["unlisted", "--download"]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(t.read("artifacts/signed/canttrust-unlisted.xpi")).toBe(bytes.toString());
+    result = t.run("amo-status.mjs", { ...env, XPI_BYTES: Buffer.from("corrupt").toString("base64") }, ["unlisted", "--download"]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("checksum mismatch");
   });
 });
