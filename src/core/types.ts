@@ -41,7 +41,7 @@ export type ValidSct = {
 
 export type CtVerdict =
   | { status: "valid"; validScts: ValidSct[]; policy: string }
-  | { status: "invalid"; reason: "missing_embedded_sct" | "no_trusted_log" | "invalid_sct_signature" | "sct_outside_log_interval" | "policy_not_satisfied"; observedLogIds: string[] }
+  | { status: "invalid"; reason: "missing_embedded_sct" | "no_trusted_log" | "invalid_sct_signature" | "sct_outside_log_interval" | "log_not_accepted_at_sct_time" | "policy_not_satisfied"; observedLogIds: string[] }
   | { status: "indeterminate"; reason: "certificate_parse_error" | "issuer_not_found" | "unsupported_signature_algorithm" | "internal_error" };
 
 export type CtMode = "yandex-required" | "hardened";

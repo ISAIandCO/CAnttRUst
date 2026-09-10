@@ -3,12 +3,22 @@ run-name: Submit listed build from ${{ github.ref_name }}
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [package.json, manifest.firefox.json]
+  schedule:
+    - cron: "47 4 * * *"
 
 permissions:
   contents: read
 
+concurrency:
+  group: amo-listed-release
+  cancel-in-progress: false
+
 jobs:
   submit-listed:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -21,10 +31,22 @@ jobs:
           node-version: 22.22.2
           cache: npm
 
-      - run: npm ci
-      - run: npm run build:firefox
+      - name: Check existing AMO version
+        id: amo
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: node scripts/amo-status.mjs
+
+      - name: Install build dependencies
+        if: github.event_name != 'schedule' && steps.amo.outputs.status == 'not-submitted'
+        run: npm ci
+      - name: Verify listed build
+        if: github.event_name != 'schedule' && steps.amo.outputs.status == 'not-submitted'
+        run: npm run build:firefox && npm run check:reproducible
 
       - name: Create source archive
+        if: github.event_name != 'schedule' && steps.amo.outputs.status == 'not-submitted'
         shell: bash
         run: |
           version="$(node -p "require('./package.json').version")"
@@ -33,6 +55,8 @@ jobs:
           echo "SOURCE_ARCHIVE=artifacts/source/canttrust-${version}-source.zip" >> "$GITHUB_ENV"
 
       - name: Submit listed build to AMO
+        id: submit
+        if: github.event_name != 'schedule' && steps.amo.outputs.status == 'not-submitted'
         env:
           WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
           WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
@@ -48,7 +72,12 @@ jobs:
           --api-secret "$WEB_EXT_API_SECRET"
           --no-input
 
+      - name: Record submission separately from publication
+        if: steps.submit.outcome == 'success'
+        run: echo "Версия отправлена в AMO. Это не подтверждение публикации; статус проверяется ежедневно." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Keep AMO response artifacts
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: amo-submission

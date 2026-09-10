@@ -16,7 +16,8 @@ const ctLogs: CtLog[] = ctListJson.operators.flatMap((operator) => operator.logs
   key: log.key,
   logId: log.log_id,
   startInclusive: Date.parse(log.temporal_interval.start_inclusive),
-  endExclusive: Date.parse(log.temporal_interval.end_exclusive)
+  endExclusive: Date.parse(log.temporal_interval.end_exclusive),
+  state: { name: Object.keys(log.state)[0]!, since: Date.parse(Object.values(log.state)[0]!.timestamp) }
 })));
 
 function warningRedirect(event: SecurityEvent): browser.webRequest.BlockingResponse {

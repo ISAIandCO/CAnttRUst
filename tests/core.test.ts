@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import ctList from "../src/policy/ct/yandex-nuc-log-list.json";
 import { matchProtectedCA } from "../src/core/ca";
-import { ecdsaDerSignatureToRaw, parseSctList, verifyEmbeddedScts, type CtLog } from "../src/core/ct";
+import { ecdsaDerSignatureToRaw, isSctFromAcceptedState, parseSctList, verifyEmbeddedScts, type CtLog } from "../src/core/ct";
 import { normalizeSha256, sha256Hex } from "../src/core/fingerprint";
 import { isHostInAllowedZones, normalizeHostname } from "../src/core/hostname";
 import { consumeBypass, createBypass } from "../src/state/bypass";
@@ -57,7 +57,8 @@ describe("SCT parser", () => {
       key: log.key,
       logId: log.log_id,
       startInclusive: Date.parse(log.temporal_interval.start_inclusive),
-      endExclusive: Date.parse(log.temporal_interval.end_exclusive)
+      endExclusive: Date.parse(log.temporal_interval.end_exclusive),
+      state: { name: Object.keys(log.state)[0]!, since: Date.parse(Object.values(log.state)[0]!.timestamp) }
     })));
     const verdict = await verifyEmbeddedScts(leaf, issuer, logs, "hardened");
     expect(verdict).toMatchObject({ status: "valid", policy: "hardened" });
@@ -89,5 +90,32 @@ describe("one-shot bypass", () => {
     expect(consumeBypass({ ...input, originalUrl: "https://example.test/other" })).toBe(false);
     expect(consumeBypass(input)).toBe(true);
     expect(consumeBypass(input)).toBe(false);
+  });
+});
+
+describe("CT log state enforcement", () => {
+  const log = (name: string, since = 100): CtLog => ({ operator: "Yandex", description: "test", key: "", logId: "", startInclusive: 0, endExclusive: 1000, state: { name, since } });
+  it("enforces activation and retirement boundaries", () => {
+    expect(isSctFromAcceptedState(log("usable"), 99)).toBe(false);
+    expect(isSctFromAcceptedState(log("usable"), 100)).toBe(true);
+    for (const state of ["readonly", "retired"]) {
+      expect(isSctFromAcceptedState(log(state), 99)).toBe(true);
+      expect(isSctFromAcceptedState(log(state), 100)).toBe(false);
+    }
+    for (const state of ["pending", "qualified", "rejected", "unknown"]) {
+      expect(isSctFromAcceptedState(log(state), 99)).toBe(false);
+      expect(isSctFromAcceptedState(log(state), 101)).toBe(false);
+    }
+    expect(isSctFromAcceptedState(log("usable", NaN), 100)).toBe(false);
+  });
+  it("rejects a cryptographically valid SCT when its log is rejected", async () => {
+    const leaf = new Uint8Array(readFileSync(new URL("fixtures/check-russian-trusted-leaf.der", import.meta.url)));
+    const issuer = new Uint8Array(readFileSync(new URL("fixtures/russian-trusted-sub-ca.der", import.meta.url)));
+    const logs: CtLog[] = ctList.operators.flatMap((operator) => operator.logs.map((item) => ({
+      operator: operator.name, description: item.description, key: item.key, logId: item.log_id,
+      startInclusive: Date.parse(item.temporal_interval.start_inclusive), endExclusive: Date.parse(item.temporal_interval.end_exclusive),
+      state: { name: "rejected", since: 0 }
+    })));
+    expect(await verifyEmbeddedScts(leaf, issuer, logs, "yandex-required")).toMatchObject({ status: "invalid", reason: "log_not_accepted_at_sct_time" });
   });
 });

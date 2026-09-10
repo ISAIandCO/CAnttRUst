@@ -9,8 +9,8 @@ if (cas.schema !== 1 || !Array.isArray(cas.cas) || !cas.cas.length) throw new Er
 for (const ca of cas.cas) {
   if (ids.has(ca.id)) throw new Error(`Duplicate CA id: ${ca.id}`);
   ids.add(ca.id);
-  if (!ca.rootDerSha256.every((value) => /^[0-9a-f]{64}$/.test(value))) throw new Error(`Invalid fingerprint: ${ca.id}`);
-  if (!ca.allowedDnsZones.every((zone) => /^(ru|su|xn--p1ai)$/.test(zone))) throw new Error(`Invalid zone: ${ca.id}`);
+  if (!Array.isArray(ca.rootDerSha256) || !ca.rootDerSha256.length || !ca.rootDerSha256.every((value) => /^[0-9a-f]{64}$/.test(value))) throw new Error(`Invalid fingerprint: ${ca.id}`);
+  if (!Array.isArray(ca.allowedDnsZones) || !ca.allowedDnsZones.length || !ca.allowedDnsZones.every((zone) => /^(ru|su|xn--p1ai)$/.test(zone))) throw new Error(`Invalid zone: ${ca.id}`);
 }
 validateCtList(logs);
 console.log(`Verified ${cas.cas.length} protected CA and ${logs.operators.flatMap((item) => item.logs).length} CT logs`);

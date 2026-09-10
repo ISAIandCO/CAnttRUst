@@ -46,10 +46,10 @@ void browser.runtime.sendMessage({ type: "warning:get", eventId }).then((respons
   setText("root", event.matchedCaSha256);
   setText("subject", event.leafSubject);
   setText("issuer", event.leafIssuer);
-  setText("ct", event.ctSummary?.status ?? "не применялся");
+  setText("ct", (event.ctSummary?.status === "log_not_accepted_at_sct_time" ? "CT-лог не принят для этого SCT (статус лога или время выдачи)" : event.ctSummary?.status) ?? "не применялся");
   setText("reason", event.reason === "protected_ca_outside_zone"
     ? "Firefox построил TLS-соединение через защищаемый российский CA вне разрешённых зон .ru, .su и .рф. Ответ сайта не был передан странице."
-    : "Сертификат построен через защищаемый российский CA, но требуемый SCT российского CT-лога не удалось криптографически подтвердить.");
+    : "Сертификат построен через защищаемый российский CA, но проверка SCT не пройдена: подписи, статус лога или время SCT не соответствуют принятой политике.");
   byId("details").hidden = false;
   if (normalizeHostname(`https://${event.host}`).kind !== "dns") byId("allow").hidden = true;
 }).catch((error: unknown) => {
