@@ -20,14 +20,6 @@
   </a>
 </p>
 
-<p align="center">
-  <a href="https://addons.mozilla.org/ru/firefox/addon/9cac43aa9dd4421b8f0e/"><strong>Установить из Firefox Add-ons</strong></a>
-  ·
-  <a href="PRIVACY.md">Приватность</a>
-  ·
-  <a href="docs/THREAT_MODEL.md">Модель угроз</a>
-</p>
-
 ---
 
 ## Что это
