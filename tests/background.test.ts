@@ -85,3 +85,38 @@ describe("request integration", () => {
     expect(state.blocked).toBe(30); expect(state.resources).toHaveLength(20);
   });
 });
+
+
+describe("simple popup exceptions", () => {
+  it("adds selected blocked hosts atomically and reloads once", async () => {
+    await request(details("script", "https://one.test/a"));
+    await request(details("script", "https://two.test/b"));
+    await message({ type: "popup:allow", tabId: 1, hosts: ["one.test", "two.test"], scope: "all", duration: "permanent" }, sender("popup"));
+    expect(stored.settings.allowlist.map((entry: any) => entry.host)).toEqual(["one.test", "two.test"]);
+    expect(browser.tabs.reload).toHaveBeenCalledTimes(1);
+  });
+  it("rejects a stale tab or unobserved domain without adding any exception", async () => {
+    await request(details("script", "https://one.test/a"));
+    const input = { type: "popup:allow", tabId: 1, hosts: ["one.test", "unobserved.test"], scope: "all", duration: "permanent" };
+    await expect(message(input, sender("popup"))).rejects.toThrow();
+    await expect(message({ ...input, tabId: 2, hosts: ["one.test"] }, sender("popup"))).rejects.toThrow();
+    expect(stored.settings).toBeUndefined();
+    expect(browser.tabs.reload).not.toHaveBeenCalled();
+  });
+  it("retains bulk candidates beyond the 20 diagnostic entries and excludes ordinary CA resources", async () => {
+    for (let i = 0; i < 30; i++) await request(details("script", `https://host${i}.test/a`));
+    tls.inspect.mockResolvedValue({ certificates: [chain[0]] });
+    for (let i = 0; i < 30; i++) await request(details("script", `https://ordinary${i}.test/a`));
+    const state = await message({ type: "popup:get" }, sender("popup"));
+    expect(state.blockedHosts).toHaveLength(30);
+    expect(state.resources).toHaveLength(20);
+    expect(state.resources.every((item: any) => item.status === "blocked")).toBe(true);
+  });
+  it("caps the badge at 99+ while retaining the exact count", async () => {
+    for (let i = 0; i < 100; i++) {
+      await request(details("script"));
+      if ([0, 98, 99].includes(i)) expect(browser.browserAction.setBadgeText).toHaveBeenLastCalledWith({ tabId: 1, text: i === 99 ? "99+" : String(i + 1) });
+    }
+    expect(await message({ type: "popup:get" }, sender("popup"))).toMatchObject({ blocked: 100 });
+  });
+});

@@ -36,7 +36,7 @@ byId("back").addEventListener("click", () => {
 });
 byId("continue").addEventListener("click", () => void navigate("warning:continue"));
 byId("allow").addEventListener("click", () => {
-  if (event && confirm(`Применить выбранное исключение для точного хоста «${event.host}»?`)) void navigate("warning:allow");
+  if (event) void navigate("warning:allow");
 });
 
 void browser.runtime.sendMessage({ type: "warning:get", eventId }).then((response: PublicSecurityEvent | null) => {
@@ -48,7 +48,6 @@ void browser.runtime.sendMessage({ type: "warning:get", eventId }).then((respons
   setText("subject", event.leafSubject);
   setText("issuer", event.leafIssuer);
   setText("ct", event.ctSummary ? reasonText(event.ctSummary.status) : "не применялся");
-  (byId("scope") as HTMLSelectElement).value = event.reason === "protected_ca_outside_zone" ? "zone" : "ct";
   setText("reason", event.reason === "protected_ca_outside_zone"
     ? "Firefox построил TLS-соединение через защищаемый российский CA вне разрешённых зон .ru, .su и .рф. Ответ сайта не был передан странице."
     : "Сертификат построен через защищаемый российский CA, но проверка SCT не пройдена: подписи, статус лога или время SCT не соответствуют принятой политике.");

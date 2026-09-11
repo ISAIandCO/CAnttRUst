@@ -94,12 +94,12 @@ try {
   await api(`/session/${session}/window`, { handle: handles.at(-1) });
   let ui;
   for (let i = 0; i < 50; i++) {
-    ui = await api(`/session/${session}/execute/sync`, { script: "return {ready: document.getElementById('details')?.hidden === false, error: document.getElementById('error')?.textContent, scope: document.getElementById('scope')?.value};", args: [] });
+    ui = await api(`/session/${session}/execute/sync`, { script: "return {ready: document.getElementById('details')?.hidden === false, error: document.getElementById('error')?.textContent, scope: document.getElementById('scope')?.value, duration: document.getElementById('duration')?.value};", args: [] });
     if (ui.ready) break;
     await new Promise((done) => setTimeout(done, 100));
   }
-  if (!ui.ready || ui.error || ui.scope !== "ct") throw new Error(`Warning UI failed: ${JSON.stringify(ui)}`);
-  outcome.passed.push("warning UI receives bound event and selects CT-only exception");
+  if (!ui.ready || ui.error || ui.scope !== "all" || ui.duration !== "permanent") throw new Error(`Warning UI failed: ${JSON.stringify(ui)}`);
+  outcome.passed.push("warning UI receives bound event and defaults to a full exception");
   await api(`/session/${session}/execute/sync`, { script: "document.getElementById('continue').click();", args: [] });
   let currentUrl;
   for (let i = 0; i < 50; i++) {
