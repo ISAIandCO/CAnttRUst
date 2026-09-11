@@ -6,8 +6,8 @@ import { isHostInAllowedZones, normalizeHostname } from "../../core/hostname";
 import type { CtMode, ExceptionScope, ExceptionDuration, ProtectedCa, SecurityEvent } from "../../core/types";
 import { clearTabBypasses, consumeBypass, createBypass } from "../../state/bypass";
 import { addEvent, clearTabEvents, getEvent, publicEvent } from "../../state/events";
-import { addAllowedHost, clearPrivateExceptions, getSettings, importSettings, isAllowed, removeAllowedHost, updateSettings } from "../../state/settings";
-import { forgetTab, getTabStatus, recordStatus, resetTab, tabEpoch, type RequestStatus } from "../../state/tab-status";
+import { addAllowedHost, addAllowedHosts, clearPrivateExceptions, getSettings, importSettings, isAllowed, removeAllowedHost, updateSettings } from "../../state/settings";
+import { badgeText, forgetTab, getTabStatus, recordStatus, resetTab, tabEpoch, type RequestStatus } from "../../state/tab-status";
 import { inspectTls } from "./tls-inspector";
 
 const protectedCas = caPolicyJson.cas as ProtectedCa[];
@@ -32,7 +32,7 @@ async function onHeadersReceived(details: browser.webRequest._OnHeadersReceivedD
   const report = (result: Omit<RequestStatus, "host" | "type">): void => {
     const state = recordStatus(details.tabId, epoch, { host: host.ascii, type: details.type, ...result });
     if (state) void browser.browserAction.setBadgeText({ tabId: details.tabId,
-      text: state.blocked ? "!" : state.unavailable ? "?" : state.main?.status === "valid" ? "CT" : "" }).catch(() => undefined);
+      text: badgeText(state) }).catch(() => undefined);
   };
   const block = (event: Omit<SecurityEvent, "id" | "timestamp">): browser.webRequest.BlockingResponse => {
     report({ status: "blocked", reason: event.ctSummary?.status ?? event.reason, ca: event.matchedCaId });
@@ -162,10 +162,11 @@ browser.runtime.onMessage.addListener(async (message: unknown, sender): Promise<
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
     if (tab?.id === undefined) throw new Error("Вкладка недоступна");
     const state = getTabStatus(tab.id);
-    if (input.type === "popup:get") return { ...state, enabled: (await getSettings()).enabled };
+    if (input.type === "popup:get") return { ...state, tabId: tab.id, enabled: (await getSettings()).enabled };
     if (input.type === "popup:allow") {
-      if (typeof input.host !== "string" || ![state.main, ...state.resources].some((item) => item && item.host === input.host && item.status === "blocked")) throw new Error("Блокировка устарела");
-      await addAllowedHost(input.host, input.scope as ExceptionScope, input.duration as ExceptionDuration, Boolean(tab.incognito));
+      if (input.tabId !== tab.id || !Array.isArray(input.hosts) || !input.hosts.length || input.hosts.length > 1000
+        || !input.hosts.every((host) => typeof host === "string" && state.blockedHosts.includes(host))) throw new Error("Список блокировок изменился. Откройте меню заново.");
+      await addAllowedHosts(input.hosts as string[], input.scope as ExceptionScope, input.duration as ExceptionDuration, Boolean(tab.incognito));
       await browser.tabs.reload(tab.id);
       return true;
     }

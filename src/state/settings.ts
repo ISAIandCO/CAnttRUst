@@ -80,18 +80,29 @@ export function updateSettings(patch: { enabled?: boolean; ctMode?: CtMode }): P
 }
 
 export function addAllowedHost(host: string, scope: ExceptionScope = "all", duration: ExceptionDuration = "permanent", incognito = false): Promise<Settings> {
-  const normalized = normalizeAllowlistHost(host);
-  if (!normalized) throw new Error("Разрешены только DNS-имена");
+  return addAllowedHosts([host], scope, duration, incognito);
+}
+
+export function addAllowedHosts(hosts: string[], scope: ExceptionScope, duration: ExceptionDuration, incognito = false): Promise<Settings> {
+  if (!Array.isArray(hosts) || !hosts.length || hosts.length > 1000) throw new Error("Выберите от 1 до 1000 доменов");
+  const normalized = [...new Set(hosts.map((host) => {
+    const value = normalizeAllowlistHost(host);
+    if (!value) throw new Error("Разрешены только DNS-имена");
+    return value;
+  }))];
   if (!["zone", "ct", "all"].includes(scope) || !["session", "hour", "permanent"].includes(duration)) throw new Error("Некорректное исключение");
-  const entry: AllowlistEntry = { id: crypto.randomUUID(), type: "exact-host", host: normalized,
-    createdAt: new Date().toISOString(), scope, incognito };
-  if (duration === "hour") entry.expiresAt = Date.now() + 3600_000;
-  if (duration === "session" || incognito) entry.sessionId = SESSION_ID;
   return mutate((settings) => {
+    const entries = normalized.map((host): AllowlistEntry => {
+      const entry: AllowlistEntry = { id: crypto.randomUUID(), type: "exact-host", host,
+        createdAt: new Date().toISOString(), scope, incognito };
+      if (duration === "hour") entry.expiresAt = Date.now() + 3600_000;
+      if (duration === "session" || incognito) entry.sessionId = SESSION_ID;
+      return entry;
+    });
     const remaining = settings.allowlist.filter((item) =>
-      !(item.host === normalized && item.scope === scope && Boolean(item.incognito) === incognito));
-    if (remaining.length >= 1000) throw new Error("Достигнут предел в 1000 исключений");
-    return { ...settings, allowlist: [...remaining, entry] };
+      !(normalized.includes(item.host) && item.scope === scope && Boolean(item.incognito) === incognito));
+    if (remaining.length + entries.length > 1000) throw new Error("Достигнут предел в 1000 исключений");
+    return { ...settings, allowlist: [...remaining, ...entries] };
   });
 }
 
