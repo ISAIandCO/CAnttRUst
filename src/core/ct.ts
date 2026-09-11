@@ -22,7 +22,20 @@ export type CtLog = {
   logId: string;
   startInclusive: number;
   endExclusive: number;
+  state: { name: string; since: number };
 };
+
+// Our NUC policy: retired/read-only logs may attest earlier SCTs;
+// rejected logs never count, including signatures issued before rejection.
+export function isSctFromAcceptedState(log: CtLog, timestamp: number): boolean {
+  if (!Number.isFinite(log.state?.since)) return false;
+  switch (log.state.name) {
+    case "usable": return timestamp >= log.state.since;
+    case "readonly":
+    case "retired": return timestamp < log.state.since;
+    default: return false;
+  }
+}
 
 function readU16(data: Uint8Array, offset: number): number {
   if (offset + 2 > data.length) throw new Error("truncated uint16");
@@ -216,12 +229,17 @@ export async function verifyEmbeddedScts(leafDer: Uint8Array, issuerDer: Uint8Ar
     const valid: ValidSct[] = [];
     let matchedLog = false;
     let outsideInterval = false;
+    let untrustedState = false;
     let invalidSignature = false;
     let unsupportedAlgorithm = false;
     for (const sct of scts) {
       const log = logs.find((candidate) => bytesEqual(fromBase64(candidate.logId), sct.logId));
       if (!log) continue;
       matchedLog = true;
+      if (!isSctFromAcceptedState(log, sct.timestamp)) {
+        untrustedState = true;
+        continue;
+      }
       if (notAfter < log.startInclusive || notAfter >= log.endExclusive || sct.timestamp > notAfter || sct.timestamp > Date.now() + MAX_FUTURE_SKEW_MS) {
         outsideInterval = true;
         continue;
@@ -241,6 +259,7 @@ export async function verifyEmbeddedScts(leafDer: Uint8Array, issuerDer: Uint8Ar
     if (satisfied) return { status: "valid", validScts: valid, policy: mode };
     const observedLogIds = scts.map((item) => base64(item.logId));
     if (!matchedLog) return { status: "invalid", reason: "no_trusted_log", observedLogIds };
+    if (untrustedState && !valid.length) return { status: "invalid", reason: "log_not_accepted_at_sct_time", observedLogIds };
     if (outsideInterval && !valid.length) return { status: "invalid", reason: "sct_outside_log_interval", observedLogIds };
     if (invalidSignature && !valid.length) return { status: "invalid", reason: "invalid_sct_signature", observedLogIds };
     return { status: "invalid", reason: "policy_not_satisfied", observedLogIds };

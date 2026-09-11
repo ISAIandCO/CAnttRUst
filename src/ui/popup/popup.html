@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>CAnttRUst</title><link rel="stylesheet" href="popup.css"></head>
+<body><main><h1>CAnttRUst</h1><p id="summary" role="status">Загрузка…</p><div id="requests"></div>
+<p>Проверяется цепочка TLS и политика защищаемых CA, а не безопасность содержимого сайта.</p>
+<fieldset id="exception" hidden><legend>Исключение для заблокированного хоста</legend>
+<label>Хост<select id="host"></select></label>
+<label>Обойти<select id="scope"><option value="zone">Только ограничение зоны</option><option value="ct">Только проверку CT</option><option value="all">Зону и CT</option></select></label>
+<label>Срок<select id="duration"><option value="session">До перезапуска расширения / браузера</option><option value="hour">На час</option><option value="permanent">Постоянно (приватно — только сессия)</option></select></label>
+<button id="allow" type="button">Применить и перезагрузить</button></fieldset>
+<p id="error" role="alert"></p><button id="options" type="button">Настройки и исключения</button></main><script src="popup.js"></script></body></html>

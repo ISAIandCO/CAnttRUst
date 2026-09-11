@@ -22,10 +22,12 @@
         <div><dt>CT</dt><dd id="ct"></dd></div>
       </dl>
       <p id="error" class="error" hidden></p>
+      <label>Обойти <select id="scope"><option value="zone">Только ограничение зоны</option><option value="ct">Только проверку CT</option><option value="all">Зону и CT</option></select></label>
+      <label>Срок <select id="duration"><option value="session">До перезапуска расширения / браузера</option><option value="hour">На час</option><option value="permanent">Постоянно (приватно — только сессия)</option></select></label>
       <div class="actions">
         <button id="back" type="button" class="secondary">Назад</button>
         <button id="continue" type="button">Продолжить один раз</button>
-        <button id="allow" type="button" class="danger">Всегда разрешать этот хост</button>
+        <button id="allow" type="button" class="danger">Применить исключение</button>
       </div>
     </main>
     <script src="warning.js"></script>

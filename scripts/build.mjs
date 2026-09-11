@@ -1,5 +1,6 @@
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { build } from "esbuild";
+import { versionForChannel } from "./release-version.mjs";
 
 const dist = new URL("../dist/firefox/", import.meta.url);
 const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
@@ -18,6 +19,8 @@ if (pkg.version !== manifest.version) {
   throw new Error(`Version mismatch: package ${pkg.version}, manifest ${manifest.version}`);
 }
 
+manifest.version = versionForChannel(pkg.version, channel === "self-hosted" ? "unlisted" : "listed");
+
 await rm(dist, { recursive: true, force: true });
 await mkdir(new URL("icons/", dist), { recursive: true });
 await mkdir(new URL("policy/ct/", dist), { recursive: true });
@@ -27,6 +30,7 @@ await build({
   entryPoints: {
     background: "src/adapters/firefox/background.ts",
     warning: "src/ui/warning/warning.ts",
+    popup: "src/ui/popup/popup.ts",
     options: "src/ui/options/options.ts"
   },
   outdir: dist.pathname,
@@ -40,8 +44,8 @@ await build({
 });
 
 await writeFile(new URL("manifest.json", dist), `${JSON.stringify(manifest, null, 2)}\n`);
-for (const name of ["warning.html", "warning.css", "options.html", "options.css"]) {
-  const area = name.startsWith("warning") ? "warning" : "options";
+for (const name of ["warning.html", "warning.css", "options.html", "options.css", "popup.html", "popup.css"]) {
+  const area = name.split(".")[0];
   await cp(new URL(`../src/ui/${area}/${name}`, import.meta.url), new URL(name, dist));
 }
 for (const size of [48, 96, 128]) {
@@ -51,4 +55,4 @@ await cp(new URL("../src/policy/protected-cas.json", import.meta.url), new URL("
 await cp(new URL("../src/policy/ct/yandex-nuc-log-list.json", import.meta.url), new URL("policy/ct/yandex-nuc-log-list.json", dist));
 await cp(new URL("../src/policy/ct/ct-policy-lock.json", import.meta.url), new URL("policy/ct/ct-policy-lock.json", dist));
 
-console.log(`Built ${pkg.name} ${pkg.version} (${channel}) in ${dist.pathname}`);
+console.log(`Built ${pkg.name} ${manifest.version} (${channel}) in ${dist.pathname}`);

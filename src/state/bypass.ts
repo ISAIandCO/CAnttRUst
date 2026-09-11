@@ -30,3 +30,7 @@ export function consumeBypass(input: Omit<Bypass, "id" | "expiresAt">): boolean 
   }
   return false;
 }
+
+export function clearTabBypasses(tabId: number): void {
+  for (const [id, entry] of entries) if (entry.tabId === tabId) entries.delete(id);
+}

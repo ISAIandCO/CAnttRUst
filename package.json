@@ -1,6 +1,6 @@
 {
   "name": "canttrust",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Restrict Russian CA trust to Russian domains in Firefox.",
   "license": "GPL-3.0-only",
@@ -18,7 +18,8 @@
     "build:firefox": "tsc --noEmit && vitest run && node scripts/build.mjs && node scripts/verify-policy.mjs && node scripts/scan-bundle.mjs && web-ext lint --source-dir dist/firefox --warnings-as-errors",
     "build:self-hosted": "tsc --noEmit && vitest run && node scripts/build.mjs self-hosted && node scripts/verify-policy.mjs && node scripts/scan-bundle.mjs && web-ext lint --source-dir dist/firefox --self-hosted --warnings-as-errors",
     "package:firefox": "tsc --noEmit && vitest run && node scripts/build.mjs && node scripts/verify-policy.mjs && node scripts/scan-bundle.mjs && web-ext lint --source-dir dist/firefox --warnings-as-errors && web-ext build --source-dir dist/firefox --artifacts-dir artifacts --filename canttrust-{version}-firefox.zip --overwrite-dest",
-    "check:reproducible": "node scripts/check-reproducible.mjs"
+    "check:reproducible": "node scripts/check-reproducible.mjs",
+    "test:firefox": "node scripts/build.mjs && node scripts/test-firefox.mjs"
   },
   "dependencies": {
     "@peculiar/asn1-schema": "2.9.4",
