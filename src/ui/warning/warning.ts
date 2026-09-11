@@ -1,3 +1,4 @@
+import { reasonText } from "../status-text";
 import { normalizeHostname } from "../../core/hostname";
 import type { PublicSecurityEvent } from "../../core/types";
 
@@ -20,7 +21,7 @@ function setBusy(value: boolean): void {
 async function navigate(type: "warning:continue" | "warning:allow"): Promise<void> {
   setBusy(true);
   try {
-    const response = await browser.runtime.sendMessage({ type, eventId }) as { originalUrl: string };
+    const response = await browser.runtime.sendMessage({ type, eventId, scope: (byId("scope") as HTMLSelectElement).value, duration: (byId("duration") as HTMLSelectElement).value }) as { originalUrl: string };
     location.replace(response.originalUrl);
   } catch (error) {
     setText("error", error instanceof Error ? error.message : "Действие не удалось");
@@ -35,7 +36,7 @@ byId("back").addEventListener("click", () => {
 });
 byId("continue").addEventListener("click", () => void navigate("warning:continue"));
 byId("allow").addEventListener("click", () => {
-  if (event && confirm(`Разрешить Russian Trusted Root CA для точного хоста «${event.host}»?`)) void navigate("warning:allow");
+  if (event && confirm(`Применить выбранное исключение для точного хоста «${event.host}»?`)) void navigate("warning:allow");
 });
 
 void browser.runtime.sendMessage({ type: "warning:get", eventId }).then((response: PublicSecurityEvent | null) => {
@@ -46,7 +47,8 @@ void browser.runtime.sendMessage({ type: "warning:get", eventId }).then((respons
   setText("root", event.matchedCaSha256);
   setText("subject", event.leafSubject);
   setText("issuer", event.leafIssuer);
-  setText("ct", (event.ctSummary?.status === "log_not_accepted_at_sct_time" ? "CT-лог не принят для этого SCT (статус лога или время выдачи)" : event.ctSummary?.status) ?? "не применялся");
+  setText("ct", event.ctSummary ? reasonText(event.ctSummary.status) : "не применялся");
+  (byId("scope") as HTMLSelectElement).value = event.reason === "protected_ca_outside_zone" ? "zone" : "ct";
   setText("reason", event.reason === "protected_ca_outside_zone"
     ? "Firefox построил TLS-соединение через защищаемый российский CA вне разрешённых зон .ru, .su и .рф. Ответ сайта не был передан странице."
     : "Сертификат построен через защищаемый российский CA, но проверка SCT не пройдена: подписи, статус лога или время SCT не соответствуют принятой политике.");

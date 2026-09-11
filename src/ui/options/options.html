@@ -14,7 +14,7 @@
       </header>
       <section>
         <h2>Защита</h2>
-        <label class="row"><input id="enabled" type="checkbox"> Проверять HTTPS-переходы</label>
+        <label class="row"><input id="enabled" type="checkbox"> Проверять HTTPS-страницы и вложенные запросы</label>
         <label for="ct-mode">Режим Certificate Transparency</label>
         <select id="ct-mode">
           <option value="yandex-required">Требовать один SCT Яндекса</option>
@@ -22,8 +22,8 @@
         </select>
       </section>
       <section>
-        <h2>Всегда разрешённые хосты</h2>
-        <p>Только точные DNS-имена. Поддомены, wildcard и IP автоматически не разрешаются.</p>
+        <h2>Исключения</h2>
+        <p>Только точные DNS-имена. Сессионные и приватные исключения не экспортируются. Поддомены, wildcard и IP автоматически не разрешаются.</p>
         <ul id="allowlist"></ul>
         <p id="empty">Список пуст.</p>
         <div class="actions">

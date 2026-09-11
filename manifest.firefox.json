@@ -7,6 +7,7 @@
     "webRequest",
     "webRequestBlocking",
     "storage",
+    "tabs",
     "<all_urls>"
   ],
   "background": {
@@ -16,11 +17,12 @@
     "persistent": true
   },
   "browser_action": {
-    "default_title": "CAnttRUst — настройки",
+    "default_title": "CAnttRUst — статус соединений",
     "default_icon": {
       "48": "icons/icon-48.png",
       "96": "icons/icon-96.png"
-    }
+    },
+    "default_popup": "popup.html"
   },
   "icons": {
     "48": "icons/icon-48.png",

@@ -1,6 +1,7 @@
 import { normalizeHostname } from "../core/hostname";
-import type { AllowlistEntry, CtMode, Settings } from "../core/types";
+import type { AllowlistEntry, CtMode, ExceptionScope, ExceptionDuration, Settings } from "../core/types";
 
+const SESSION_ID = crypto.randomUUID();
 const STORAGE_KEY = "settings";
 export const DEFAULT_SETTINGS: Settings = { schema: 1, enabled: true, ctMode: "yandex-required", allowlist: [] };
 
@@ -15,6 +16,9 @@ function validateEntry(value: unknown): AllowlistEntry | null {
   const candidate = value as Partial<AllowlistEntry>;
   const host = normalizeAllowlistHost(candidate.host);
   if (!host || candidate.type !== "exact-host") return null;
+  if (candidate.scope !== undefined && !["zone", "ct", "all"].includes(candidate.scope)) return null;
+  if (candidate.expiresAt !== undefined && (!Number.isFinite(candidate.expiresAt) || candidate.expiresAt <= Date.now())) return null;
+  if (candidate.sessionId !== undefined && candidate.sessionId !== SESSION_ID) return null;
   const createdAt = typeof candidate.createdAt === "string" && Number.isFinite(Date.parse(candidate.createdAt))
     ? candidate.createdAt
     : new Date().toISOString();
@@ -22,8 +26,12 @@ function validateEntry(value: unknown): AllowlistEntry | null {
     id: typeof candidate.id === "string" && candidate.id.length <= 100 ? candidate.id : crypto.randomUUID(),
     type: "exact-host",
     host,
-    createdAt
+    createdAt,
+    scope: candidate.scope ?? "all",
+    incognito: candidate.incognito === true
   };
+  if (candidate.expiresAt !== undefined) entry.expiresAt = candidate.expiresAt;
+  if (candidate.sessionId !== undefined) entry.sessionId = candidate.sessionId;
   if (typeof candidate.note === "string" && candidate.note.length <= 256) entry.note = candidate.note;
   return entry;
 }
@@ -36,7 +44,7 @@ export function parseSettings(value: unknown): Settings {
   if (Array.isArray(candidate.allowlist)) {
     for (const value of candidate.allowlist.slice(0, 1000)) {
       const entry = validateEntry(value);
-      if (entry) unique.set(entry.host, entry);
+      if (entry) unique.set(`${entry.host}:${entry.scope}:${entry.incognito}`, entry);
     }
   }
   return { schema: 1, enabled: candidate.enabled !== false, ctMode: mode, allowlist: [...unique.values()] };
@@ -50,40 +58,62 @@ export function getSettings(): Promise<Settings> {
     current = parseSettings(stored[STORAGE_KEY]);
     return current;
   });
-  return ready.then(() => structuredClone(current));
+  return ready.then(() => parseSettings(current));
 }
 
-async function save(next: Settings): Promise<Settings> {
-  current = parseSettings(next);
-  ready = Promise.resolve(current);
-  await browser.storage.local.set({ [STORAGE_KEY]: current });
-  return structuredClone(current);
+let writes: Promise<unknown> = Promise.resolve();
+function mutate(change: (settings: Settings) => Settings): Promise<Settings> {
+  const operation = writes.then(async () => {
+    const next = parseSettings(change(await getSettings()));
+    await browser.storage.local.set({ [STORAGE_KEY]: { ...next,
+      allowlist: next.allowlist.filter((entry) => !entry.sessionId && !entry.incognito)
+    } });
+    current = next;
+    return structuredClone(next);
+  });
+  writes = operation.catch(() => undefined);
+  return operation;
 }
 
-export async function updateSettings(patch: { enabled?: boolean; ctMode?: CtMode }): Promise<Settings> {
-  await getSettings();
-  return save({ ...current, ...patch });
+export function updateSettings(patch: { enabled?: boolean; ctMode?: CtMode }): Promise<Settings> {
+  return mutate((settings) => ({ ...settings, ...patch }));
 }
 
-export async function addAllowedHost(host: string): Promise<Settings> {
-  await getSettings();
+export function addAllowedHost(host: string, scope: ExceptionScope = "all", duration: ExceptionDuration = "permanent", incognito = false): Promise<Settings> {
   const normalized = normalizeAllowlistHost(host);
   if (!normalized) throw new Error("Разрешены только DNS-имена");
-  if (current.allowlist.some((entry) => entry.host === normalized)) return structuredClone(current);
-  return save({ ...current, allowlist: [...current.allowlist, { id: crypto.randomUUID(), type: "exact-host", host: normalized, createdAt: new Date().toISOString() }] });
+  if (!["zone", "ct", "all"].includes(scope) || !["session", "hour", "permanent"].includes(duration)) throw new Error("Некорректное исключение");
+  const entry: AllowlistEntry = { id: crypto.randomUUID(), type: "exact-host", host: normalized,
+    createdAt: new Date().toISOString(), scope, incognito };
+  if (duration === "hour") entry.expiresAt = Date.now() + 3600_000;
+  if (duration === "session" || incognito) entry.sessionId = SESSION_ID;
+  return mutate((settings) => {
+    const remaining = settings.allowlist.filter((item) =>
+      !(item.host === normalized && item.scope === scope && Boolean(item.incognito) === incognito));
+    if (remaining.length >= 1000) throw new Error("Достигнут предел в 1000 исключений");
+    return { ...settings, allowlist: [...remaining, entry] };
+  });
 }
 
-export async function removeAllowedHost(id: string): Promise<Settings> {
-  await getSettings();
-  return save({ ...current, allowlist: current.allowlist.filter((entry) => entry.id !== id) });
+export function removeAllowedHost(id: string): Promise<Settings> {
+  return mutate((settings) => ({ ...settings, allowlist: settings.allowlist.filter((entry) => entry.id !== id) }));
 }
 
-export async function importSettings(value: unknown): Promise<Settings> {
+export function clearPrivateExceptions(): Promise<Settings> {
+  return mutate((settings) => ({ ...settings, allowlist: settings.allowlist.filter((entry) => !entry.incognito) }));
+}
+
+export function importSettings(value: unknown): Promise<Settings> {
   const serialized = JSON.stringify(value);
-  if (serialized.length > 256 * 1024) throw new Error("Файл настроек слишком большой");
-  return save(parseSettings(value));
+  if (!serialized || serialized.length > 256 * 1024) throw new Error("Файл настроек слишком большой");
+  const parsed = parseSettings(value);
+  parsed.allowlist = parsed.allowlist.filter((entry) => !entry.sessionId && !entry.incognito);
+  return mutate(() => parsed);
 }
 
-export function isAllowed(settings: Settings, host: string): boolean {
-  return settings.allowlist.some((entry) => entry.host === host);
+export function isAllowed(settings: Settings, host: string, scope: "zone" | "ct", incognito = false): boolean {
+  return settings.allowlist.some((entry) => entry.host === host && Boolean(entry.incognito) === incognito
+    && (entry.scope === undefined || entry.scope === "all" || entry.scope === scope)
+    && (entry.expiresAt === undefined || entry.expiresAt > Date.now())
+    && (entry.sessionId === undefined || entry.sessionId === SESSION_ID));
 }

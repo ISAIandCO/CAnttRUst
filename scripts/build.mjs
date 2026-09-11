@@ -30,6 +30,7 @@ await build({
   entryPoints: {
     background: "src/adapters/firefox/background.ts",
     warning: "src/ui/warning/warning.ts",
+    popup: "src/ui/popup/popup.ts",
     options: "src/ui/options/options.ts"
   },
   outdir: dist.pathname,
@@ -43,8 +44,8 @@ await build({
 });
 
 await writeFile(new URL("manifest.json", dist), `${JSON.stringify(manifest, null, 2)}\n`);
-for (const name of ["warning.html", "warning.css", "options.html", "options.css"]) {
-  const area = name.startsWith("warning") ? "warning" : "options";
+for (const name of ["warning.html", "warning.css", "options.html", "options.css", "popup.html", "popup.css"]) {
+  const area = name.split(".")[0];
   await cp(new URL(`../src/ui/${area}/${name}`, import.meta.url), new URL(name, dist));
 }
 for (const size of [48, 96, 128]) {

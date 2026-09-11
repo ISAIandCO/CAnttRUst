@@ -26,3 +26,7 @@ export function publicEvent(event: SecurityEvent): PublicSecurityEvent {
   const { originalUrl: _originalUrl, ...safe } = event;
   return safe;
 }
+
+export function clearTabEvents(tabId: number): void {
+  for (const [id, event] of events) if (event.tabId === tabId) events.delete(id);
+}

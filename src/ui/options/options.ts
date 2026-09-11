@@ -21,7 +21,7 @@ function render(next: Settings): void {
   list.replaceChildren(...settings.allowlist.map((entry) => {
     const item = document.createElement("li");
     const host = document.createElement("span");
-    host.textContent = entry.host;
+    host.textContent = `${entry.host} · ${{ zone: "зона", ct: "CT", all: "зона и CT" }[entry.scope ?? "all"]} · ${entry.expiresAt ? `до ${new Date(entry.expiresAt).toLocaleString()}` : entry.sessionId ? "сессия" : "постоянно"}${entry.incognito ? " · приватно" : ""}`;
     const remove = document.createElement("button");
     remove.type = "button";
     remove.textContent = "Удалить";
@@ -48,7 +48,7 @@ async function save(): Promise<void> {
 byId("enabled").addEventListener("change", () => void save());
 byId("ct-mode").addEventListener("change", () => void save());
 byId("export").addEventListener("click", () => {
-  const url = URL.createObjectURL(new Blob([`${JSON.stringify(settings, null, 2)}\n`], { type: "application/json" }));
+  const url = URL.createObjectURL(new Blob([`${JSON.stringify({ ...settings, allowlist: settings.allowlist.filter((entry) => !entry.sessionId && !entry.incognito) }, null, 2)}\n`], { type: "application/json" }));
   const link = document.createElement("a");
   link.href = url;
   link.download = "canttrust-settings.json";

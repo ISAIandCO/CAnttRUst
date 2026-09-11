@@ -1,0 +1,6 @@
+:root { color-scheme: light dark; font: 14px system-ui, sans-serif; }
+body { width: 370px; margin: 0; }
+main { padding: 16px; } h1 { margin-top: 0; font-size: 21px; }
+p, section { overflow-wrap: anywhere; } section { border-top: 1px solid #888; padding: 8px 0; }
+label { display: block; margin: 8px 0; } select, button { width: 100%; padding: 7px; font: inherit; }
+fieldset { margin: 12px 0; } #error { color: #d34b4b; }

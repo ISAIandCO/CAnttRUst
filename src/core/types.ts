@@ -46,12 +46,19 @@ export type CtVerdict =
 
 export type CtMode = "yandex-required" | "hardened";
 
+export type ExceptionScope = "zone" | "ct" | "all";
+export type ExceptionDuration = "session" | "hour" | "permanent";
+
 export type AllowlistEntry = {
   id: string;
   type: "exact-host";
   host: string;
   createdAt: string;
   note?: string;
+  scope?: ExceptionScope;
+  expiresAt?: number;
+  sessionId?: string;
+  incognito?: boolean;
 };
 
 export type Settings = {
