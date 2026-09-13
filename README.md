@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src/ui/icons/icon-128.png" width="128" height="128" alt="CAnttRUst">
+  <img src="src/ui/icons/icon-512.png" width="200" height="200" alt="CAnttRUst">
 </p>
 
 <h1 align="center">CAnttRUst</h1>
