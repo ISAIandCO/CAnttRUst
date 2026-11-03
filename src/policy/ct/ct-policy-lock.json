@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "source": "https://browser-resources.s3.yandex.net/ctlog/ctlog.json",
-  "retrievedAt": "2026-08-25T03:42:02.860Z",
-  "sourceSha256": "26bb8d8d623ca3d439301c13119db94aa68bf437cb290178b682b2a5529edd97",
+  "retrievedAt": "2026-11-03T11:55:35.824Z",
+  "sourceSha256": "d13b6a2b7c24765a347df2a2b6ea027e35f98a286cc3975c0c9f0a763925e341",
   "acceptedOperators": [
     "Yandex",
     "VK LLC",
