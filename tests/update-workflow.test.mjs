@@ -22,6 +22,7 @@ globalThis.fetch = async (url) => {
   if (String(url).includes('/downloads/')) return new Response(Buffer.from(process.env.XPI_BYTES || '', 'base64'));
   if (String(url).includes('addons.mozilla.org')) return new Response(process.env.AMO_BODY || '', {status:Number(process.env.AMO_HTTP || 200)});
   if (String(url).includes('gu-st.ru')) return new Response(readFileSync(process.env.ROOT_FILE), {status:Number(process.env.ROOT_HTTP || 200)});
+  if (process.env.CT_NETWORK_ERROR) throw new TypeError('fetch failed', {cause:Object.assign(new Error('connect failed'), {code:'ETIMEDOUT'})});
   return new Response(readFileSync(process.env.CT_FILE));
 };`);
   const ctPath = join(dir, "source.json");
@@ -65,6 +66,15 @@ describe("policy update pipeline", () => {
     expect(t.read("output")).toContain("changed=true\nerrors=true");
     expect(t.read("artifacts/policy-errors.md")).toContain("503");
     expect(t.git("diff", "--", "src/policy/protected-cas.json")).toBe("");
+  });
+  it("reports an exhausted CT timeout while still checking roots and preserving accepted policy", () => {
+    const t = setup(); t.save();
+    const result = t.run("prepare-policy-update.mjs", { CT_NETWORK_ERROR: "true" });
+    expect(result.status, result.stderr).toBe(0);
+    expect(t.read("output")).toContain("changed=false\nerrors=true");
+    expect(t.read("artifacts/policy-errors.md")).toContain("ETIMEDOUT");
+    expect(t.read("artifacts/policy-update.md")).toContain("Корневые сертификаты: проверено.");
+    expect(t.git("diff", "--stat")).toBe("");
   });
 });
 
