@@ -7,7 +7,7 @@ const errors = [];
 const checks = [];
 for (const [name, script] of [["CT-логи", "update-ct-policy.mjs"], ["Корневые сертификаты", "update-ca-policy.mjs"]]) {
   try {
-    const output = execFileSync(process.execPath, [`scripts/${script}`], { encoding: "utf8", timeout: 60000 });
+    const output = execFileSync(process.execPath, [`scripts/${script}`], { encoding: "utf8", timeout: 120000 });
     checks.push(`${name}: проверено.\n${output.trim()}`);
   } catch (error) {
     errors.push(`${name}: ${String(error.stderr || error.message).slice(0, 4000)}`);
